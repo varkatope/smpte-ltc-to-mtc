@@ -10,7 +10,7 @@ import tkinter as tk
 FORMAT = pyaudio.paInt16
 CHANNELS = 1
 RATE = 48000
-CHUNK = 2048
+CHUNK = 4096
 SYNC_WORD = '0011111111111101'
 jam = '00:00:00:00'
 now_tc = '00:00:00:00'
@@ -70,7 +70,7 @@ def print_tc():
     last_jam = jam
     h,m,s,f = [int(x) for x in jam.split(':')]
     while enable_listening.get():
-        if jam == None:
+        if jam is None:
             break
         if jam != last_jam:
             h,m,s,f = [int(x) for x in jam.split(':')]
@@ -143,12 +143,13 @@ def init_ltc_listener():
     t = threading.Thread(target=print_tc)
     t.start()
 
-    stream = p.open(format=FORMAT,
+    stream = p.open(rate=RATE,
                     channels=CHANNELS,
-                    rate=RATE,
+                    format=FORMAT,
                     input=True,
-                    frames_per_buffer=CHUNK,
-                    input_device_index=micro_selectionne)
+                    input_device_index=micro_selectionne,
+                    frames_per_buffer=CHUNK
+                    )
 
     frames = []
     loop_decode_ltc(stream,frames)
@@ -234,6 +235,8 @@ def get_available_microphones():
         device_info = p.get_device_info_by_index(i)
         if device_info.get('maxInputChannels') > 0:
             microphones.append(device_info['name'])
+            print("!!!!!!!!!!!!!!!!!!!!!!!!!")
+            print((i,device_info['name'],device_info['maxInputChannels'])) # To figure out which devices available while selection not working.
 
     p.terminate()
     return microphones
@@ -258,19 +261,25 @@ def str_frequency_to_int(str):
 
 # Toggle LTC Listener from button
 def toggle_read_ltc():
-    enable_listening.set(True) if enable_listening.get() == False else enable_listening.set(False)
-    status_color.set("Orange") if enable_listening.get() == True else status_color.set("Red")
+    enable_listening.set(True) if enable_listening.get() is False else enable_listening.set(False)
+    status_color.set("Orange") if enable_listening.get() is True else status_color.set("Red")
     status_square.configure(bg=status_color.get())
     if enable_listening.get():
         toggle_button.configure(text="Disable listener")
         label_microphone.configure(state="disabled")
         label_frequency.configure(state="disabled")
         label_midi.configure(state="disabled")
+        option_frequency.configure(state="disabled")
+        option_microphone.configure(state="disabled")
+        option_midi.configure(state="disabled")
     else:
         toggle_button.configure(text="Enable listener")
         label_microphone.configure(state="normal")
         label_frequency.configure(state="normal")
         label_midi.configure(state="normal")
+        option_microphone.configure(state="normal")
+        option_frequency.configure(state="normal")
+        option_midi.configure(state="normal")
 
     init_ltc_listener()
 
@@ -281,7 +290,7 @@ midis_options = get_available_midis()
 
 # Create main frame
 frame = tk.Tk()
-frame.title("SMPTE LTC to MTC 1.0.1")
+frame.title("SMPTE LTC to MTC 2.0.0")
 frame.geometry("300x300")
 frame.resizable(width=False, height=False)
 
@@ -289,7 +298,8 @@ frame.resizable(width=False, height=False)
 selected_microphone = tk.StringVar(value=microphones_options[0])
 selected_frequency = tk.StringVar(value=frequencies_options[0])
 selected_midi = tk.StringVar(value=midis_options[0])
-selected_microphone_index = tk.IntVar(value=0)
+selected_microphone_index = tk.IntVar(value=3) # Currently JACK. Need better way to set/get index.
+
 enable_listening = tk.BooleanVar(value=False)
 status_color = tk.StringVar(value="Red")
 
@@ -305,20 +315,20 @@ status_square.grid(row=0, column=4, pady=10, sticky="n")
 # Draw microphone selector
 label_microphone = tk.Label(frame, text="Select microphone", font=("Helvetica", 10, "bold"))
 label_microphone.grid(row=1, column=4, pady=5, sticky="n")
-label_microphone = tk.OptionMenu(frame, selected_microphone, *microphones_options)
-label_microphone.grid(row=2, column=4, pady=5, sticky="n")
+option_microphone = tk.OptionMenu(frame, selected_microphone, *microphones_options)
+option_microphone.grid(row=2, column=4, pady=5, sticky="n")
 
 # Draw frequency selector
 label_frequency = tk.Label(frame, text="Select frequency", font=("Helvetica", 10, "bold"))
 label_frequency.grid(row=3, column=4, pady=5, sticky="n")
-label_frequency = tk.OptionMenu(frame, selected_frequency, *frequencies_options)
-label_frequency.grid(row=4, column=4, pady=5, sticky="n")
+option_frequency = tk.OptionMenu(frame, selected_frequency, *frequencies_options)
+option_frequency.grid(row=4, column=4, pady=5, sticky="n")
 
 # Draw MIDI output selector
 label_midi = tk.Label(frame, text="Select MIDI output", font=("Helvetica", 10, "bold"))
 label_midi.grid(row=5, column=4, pady=5, sticky="n")
-label_midi = tk.OptionMenu(frame, selected_midi, *midis_options)
-label_midi.grid(row=6, column=4, pady=5, sticky="n")
+option_midi = tk.OptionMenu(frame, selected_midi, *midis_options)
+option_midi.grid(row=6, column=4, pady=5, sticky="n")
 
 # Draw toggle button
 toggle_button = tk.Button(frame, text="Enable listener", command=toggle_read_ltc)
